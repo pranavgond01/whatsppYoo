@@ -19,17 +19,16 @@ app.listen(PORT, () => {
 // ⚠️ AAPKA GROUP JID
 const TARGET_GROUP_JID = '120363414636843883@g.us'; 
 
-// ⚠️ APNA PERSONAL WHATSAPP NUMBER YAHAN DALEIN (Country code ke saath, bina '+' ke)
-// Jaise agar number 9876543210 hai, toh '919876543210@s.whatsapp.net' likhein
-const MY_PERSONAL_JID = '917620692399@s.whatsapp.net'; // <-- Ise apne number se badal lein!
-
 async function startBot() {
     const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys');
 
     const sock = makeWASocket({
         logger: pino({ level: 'silent' }),
         auth: state,
-        printQRInTerminal: false
+        printQRInTerminal: false,
+        // 👇 Yeh options add karne se incoming messages aur group events reliably milte hain
+        syncFullHistory: false,
+        markOnlineOnConnect: true
     });
 
     sock.ev.on('creds.update', saveCreds);
@@ -55,30 +54,37 @@ async function startBot() {
         await sendGroupPoll(sock, TARGET_GROUP_JID);
     });
 
-    // 📩 Incoming Messages Handler (Check if you sent "hello")
-   // 📩 Incoming Messages Handler (Check if you sent "Hi" or "hello")
-    // 📩 Incoming Messages Handler (Ab group ka koi bhi member "Hi" ya "Hello" likhega toh bot reply karega)
-    sock.ev.on('messages.upsert', async (m) => {
-        const msg = m.messages[0];
-        if (!msg.message || msg.key.fromMe) return; // Bot ke khud ke messages ignore karein
+    // 📩 Improved Incoming Messages Handler
+    sock.ev.on('messages.upsert', async (event) => {
+        const messages = event.messages;
+        for (const msg of messages) {
+            // Agar message khud bot ka bheja hua hai ya message empty hai toh return
+            if (!msg.message || msg.key.fromMe) continue;
 
-        const chatId = msg.key.remoteJid;
-        
-        // Message text nikalne ke liye
-        const messageContent = msg.message.conversation || msg.message.extendedTextMessage?.text;
-        const text = messageContent?.trim().toLowerCase();
+            const chatId = msg.key.remoteJid;
 
-        // Terminal par check karne ke liye ki message aa raha hai ya nahi
-        if (chatId === TARGET_GROUP_JID) {
-            console.log(`💬 Group Message Received: "${messageContent}"`);
-        }
+            // Sirf target group ke messages par dhyan dein
+            if (chatId !== TARGET_GROUP_JID) continue;
 
-        // Agar message target group se hai aur text "hi" ya "hello" hai
-        if (chatId === TARGET_GROUP_JID && (text === 'hi' || text === 'hello')) {
-            console.log('✅ Trigger matched! Sending reply...');
-            await sock.sendMessage(TARGET_GROUP_JID, {
-                text: 'Hello, bot is alive! 🤖🚀'
-            }, { quoted: msg });
+            // Saare possible text formats nikalne ka tarika
+            const messageContent = 
+                msg.message.conversation || 
+                msg.message.extendedTextMessage?.text || 
+                msg.message.imageMessage?.caption || 
+                msg.message.videoMessage?.caption;
+
+            if (!messageContent) continue;
+
+            const text = messageContent.trim().toLowerCase();
+            console.log(`💬 Group Message Captured: "${messageContent}"`);
+
+            // Agar message "hi" ya "hello" hai
+            if (text === 'hi' || text === 'hello') {
+                console.log('✅ Trigger matched! Sending reply...');
+                await sock.sendMessage(TARGET_GROUP_JID, {
+                    text: 'Hello, bot is alive! 🤖🚀'
+                }, { quoted: msg });
+            }
         }
     });
 
@@ -87,14 +93,10 @@ async function startBot() {
         for (const update of updates) {
             if (update.update.pollUpdates) {
                 const pollVotes = update.update.pollUpdates;
-
                 for (const vote of pollVotes) {
                     const voterJid = vote.pollUpdateMessageKey.participant || vote.pollUpdateMessageKey.remoteJid;
                     const voterNumber = voterJid.split('@')[0];
-                    
-                    console.log(`\n📊 NEW POLL SELECTION:`);
-                    console.log(`👤 User: +${voterNumber}`);
-                    console.log(`📩 Selection Data Received!`);
+                    console.log(`\n📊 NEW POLL SELECTION: +${voterNumber}`);
                 }
             }
         }
