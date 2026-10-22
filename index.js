@@ -3,23 +3,18 @@ import qrcode from 'qrcode-terminal';
 import cron from 'node-cron';
 import pino from 'pino';
 import express from 'express';
-import Groq from 'groq-sdk'; // 👈 Groq SDK import kiya
 
 // 🌐 Express Web Server for Render
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.get('/', (req, res) => {
-    res.send('🤖 WhatsApp Chill AI & Poll Bot is running 24/7 on Cloud!');
+    res.send('🤖 WhatsApp Poll Bot is running 24/7 on Cloud!');
 });
 
 app.listen(PORT, () => {
     console.log(`🌐 Web server is running on port ${PORT}`);
 });
-
-// ⚠️ APNI GROQ API KEY YAHAN DALEN (Ya Environment Variable mein set karein)
-// ⚠️ Groq API key ko environment variable se load karein
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 // ⚠️ AAPKA GROUP JID
 const TARGET_GROUP_JID = '120363414636843883@g.us'; 
@@ -31,6 +26,7 @@ async function startBot() {
         logger: pino({ level: 'silent' }),
         auth: state,
         printQRInTerminal: false,
+        // 👇 Yeh options add karne se incoming messages aur group events reliably milte hain
         syncFullHistory: false,
         markOnlineOnConnect: true
     });
@@ -52,89 +48,47 @@ async function startBot() {
         }
     });
 
-    // ⏰ Schedule Every Day at 7:00 PM (19:00) for Mandir Poll
+    // ⏰ Schedule Every Day at 7:00 PM (19:00)
     cron.schedule('0 19 * * *', async () => {
         console.log('⏰ Executing Daily 7:00 PM Poll Task...');
         await sendGroupPoll(sock, TARGET_GROUP_JID);
     });
 
-    // 📩 Incoming Messages Handler (Poll Check + Groq Chill AI Chat)
+    // 📩 Improved Incoming Messages Handler
     sock.ev.on('messages.upsert', async (event) => {
         const messages = event.messages;
         for (const msg of messages) {
+            // Agar message khud bot ka bheja hua hai ya message empty hai toh return
             if (!msg.message || msg.key.fromMe) continue;
 
             const chatId = msg.key.remoteJid;
-            if (chatId !== TARGET_GROUP_JID) continue; // Sirf target group par kaam karega
 
+            // Sirf target group ke messages par dhyan dein
+            if (chatId !== TARGET_GROUP_JID) continue;
+
+            // Saare possible text formats nikalne ka tarika
             const messageContent = 
                 msg.message.conversation || 
                 msg.message.extendedTextMessage?.text || 
-                msg.message.imageMessage?.caption;
+                msg.message.imageMessage?.caption || 
+                msg.message.videoMessage?.caption;
 
             if (!messageContent) continue;
 
-            const text = messageContent.trim();
-            const lowerText = text.toLowerCase();
+            const text = messageContent.trim().toLowerCase();
+            console.log(`💬 Group Message Captured: "${messageContent}"`);
 
-            // 1. Alive Check Trigger ("hi" / "hello")
-            if (lowerText === 'hi' || lowerText === 'hello') {
+            // Agar message "hi" ya "hello" hai
+            if (text === 'hi' || text === 'hello') {
+                console.log('✅ Trigger matched! Sending reply...');
                 await sock.sendMessage(TARGET_GROUP_JID, {
-                    text: 'Hello, bot is alive! 🤖🚀 Aur batao, kya chal raha hai?'
+                    text: 'Hello, bot is alive! 🤖🚀'
                 }, { quoted: msg });
-                continue;
-            }
-
-            // 2. Groq AI Chill Bot Trigger 
-            // (Aap group mein jab bhi bot ko mention karenge ya seedha message bhejenge, yeh Groq se chill reply dega)
-            // Yahan hum check kar rahe hain ki kya message bot ko tag kiya gaya hai ya phir aap normal baat kar rahe hain
-            const botNumberId = sock.user.id.split(':')[0] + '@s.whatsapp.net';
-            const isMentioned = msg.message.extendedTextMessage?.contextInfo?.mentionedJid?.includes(botNumberId);
-
-            // Agar aap chahte hain ki har message par reply kare toh 'true' rakhein, 
-            // ya agar sirf mention par kare toh 'isMentioned' check karein. Abhi hum ise smart rakhte hain ki mention karne par ya normal text par reply kare.
-            if (isMentioned || text.startsWith('!ai') || text.startsWith('bot')) {
-                // Mention ya '!ai' command hatakar clean text le lete hain
-                let cleanQuery = text.replace(/@\d+/g, '').replace('!ai', '').replace('bot', '').trim();
-                if (!cleanQuery) cleanQuery = "Batao bhai, kya haal hai?";
-
-                console.log(`🤖 Generating Groq AI response for: "${cleanQuery}"`);
-
-                try {
-                    // Groq API Call (Using Llama-3 model for lightning fast chill responses)
-                    const chatCompletion = await groq.chat.completions.create({
-                        messages: [
-                            {
-                                role: "system",
-                                content: "You are a very chill, friendly, funny, and casual WhatsApp AI buddy. Talk like a cool friend using Hinglish (mix of Hindi and English) with appropriate emojis. Keep answers crisp and engaging."
-                            },
-                            {
-                                role: "user",
-                                content: cleanQuery
-                            }
-                        ],
-                        model: "llama-3.3-70b-versatile", // Super fast and smart Groq model
-                        temperature: 0.7,
-                        max_tokens: 300,
-                    });
-
-                    const aiReply = chatCompletion.choices[0]?.message?.content || "Arre bhai, samajh nahi aaya, thoda wapas bol! 😅";
-
-                    await sock.sendMessage(TARGET_GROUP_JID, {
-                        text: aiReply
-                    }, { quoted: msg });
-
-                } catch (error) {
-                    console.error('Groq API Error:', error);
-                    await sock.sendMessage(TARGET_GROUP_JID, {
-                        text: 'Arre yaar, abhi mera dimaag thoda hang ho gaya hai (Groq API limit/error)! 🤖💀'
-                    }, { quoted: msg });
-                }
             }
         }
     });
 
-    // 📊 Track Live Poll Votes
+    // 📊 Track Live Poll Votes & Log Responses
     sock.ev.on('messages.update', async (updates) => {
         for (const update of updates) {
             if (update.update.pollUpdates) {
