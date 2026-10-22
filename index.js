@@ -57,20 +57,25 @@ async function startBot() {
 
     // 📩 Incoming Messages Handler (Check if you sent "hello")
    // 📩 Incoming Messages Handler (Check if you sent "Hi" or "hello")
+    // 📩 Incoming Messages Handler (Ab group ka koi bhi member "Hi" ya "Hello" likhega toh bot reply karega)
     sock.ev.on('messages.upsert', async (m) => {
         const msg = m.messages[0];
-        if (!msg.message || msg.key.fromMe) return; // Khud ke message ignore karein
+        if (!msg.message || msg.key.fromMe) return; // Bot ke khud ke messages ignore karein
 
-        const senderJid = msg.key.participant || msg.key.remoteJid;
         const chatId = msg.key.remoteJid;
         
-        // Message text nikalne ke liye aur lowercase/trim karne ke liye
+        // Message text nikalne ke liye
         const messageContent = msg.message.conversation || msg.message.extendedTextMessage?.text;
         const text = messageContent?.trim().toLowerCase();
 
-        // Check if message is from target group, sent by YOU, and text is "hi" or "hello"
-        if (text === 'hi' || text === 'hello') {
-            console.log('✅ Hi command triggered by Pranav!');
+        // Terminal par check karne ke liye ki message aa raha hai ya nahi
+        if (chatId === TARGET_GROUP_JID) {
+            console.log(`💬 Group Message Received: "${messageContent}"`);
+        }
+
+        // Agar message target group se hai aur text "hi" ya "hello" hai
+        if (chatId === TARGET_GROUP_JID && (text === 'hi' || text === 'hello')) {
+            console.log('✅ Trigger matched! Sending reply...');
             await sock.sendMessage(TARGET_GROUP_JID, {
                 text: 'Hello, bot is alive! 🤖🚀'
             }, { quoted: msg });
