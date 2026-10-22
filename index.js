@@ -50,7 +50,7 @@ async function startBot() {
     });
 
     // ⏰ Schedule Every Day at 7:00 PM (19:00)
-    cron.schedule('*/1 * * * *', async () => {
+    cron.schedule('0 19 * * *', async () => {
         console.log('⏰ Executing Daily 7:00 PM Poll Task...');
         await sendGroupPoll(sock, TARGET_GROUP_JID);
     });
