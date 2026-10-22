@@ -69,7 +69,7 @@ async function startBot() {
         const text = messageContent?.trim().toLowerCase();
 
         // Check if message is from target group, sent by YOU, and text is "hi" or "hello"
-        if (chatId === TARGET_GROUP_JID && senderJid === MY_PERSONAL_JID && (text === 'hi' || text === 'hello')) {
+        if (text === 'hi' || text === 'hello') {
             console.log('✅ Hi command triggered by Pranav!');
             await sock.sendMessage(TARGET_GROUP_JID, {
                 text: 'Hello, bot is alive! 🤖🚀'
