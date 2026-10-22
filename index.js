@@ -56,6 +56,7 @@ async function startBot() {
     });
 
     // 📩 Incoming Messages Handler (Check if you sent "hello")
+   // 📩 Incoming Messages Handler (Check if you sent "Hi" or "hello")
     sock.ev.on('messages.upsert', async (m) => {
         const msg = m.messages[0];
         if (!msg.message || msg.key.fromMe) return; // Khud ke message ignore karein
@@ -63,14 +64,15 @@ async function startBot() {
         const senderJid = msg.key.participant || msg.key.remoteJid;
         const chatId = msg.key.remoteJid;
         
-        // Message text nikalne ke liye
+        // Message text nikalne ke liye aur lowercase/trim karne ke liye
         const messageContent = msg.message.conversation || msg.message.extendedTextMessage?.text;
+        const text = messageContent?.trim().toLowerCase();
 
-        // Check if message is from target group and sent by YOU, and text is "hello"
-        if (chatId === TARGET_GROUP_JID && senderJid === MY_PERSONAL_JID && messageContent?.toLowerCase() === 'hello') {
-            console.log('✅ Hello command triggered by Pranav!');
+        // Check if message is from target group, sent by YOU, and text is "hi" or "hello"
+        if (chatId === TARGET_GROUP_JID && senderJid === MY_PERSONAL_JID && (text === 'hi' || text === 'hello')) {
+            console.log('✅ Hi command triggered by Pranav!');
             await sock.sendMessage(TARGET_GROUP_JID, {
-                text: '👋 Hello Pranav! Bot is online, active, and ready to roll! 🚀'
+                text: 'Hello, bot is alive! 🤖🚀'
             }, { quoted: msg });
         }
     });
